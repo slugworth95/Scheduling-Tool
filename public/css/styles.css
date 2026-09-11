@@ -1,0 +1,161 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  min-height: 100vh;
+}
+[hidden] {
+  display: none !important;
+}
+header {
+  background: #fffbeb;
+  color: #78350f;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+header .logo-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.8rem;
+}
+header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: 0.5px; color: #78350f; }
+header span { font-size: 0.85rem; opacity: 0.75; margin-left: auto; color: #555; }
+
+/* ─── Auth ─── */
+.auth-container { max-width: 420px; margin: 3rem auto; padding: 0 1.5rem; }
+.auth-card {
+  background: #fff; border: 1px solid #ddd; border-radius: 10px;
+  padding: 2rem; box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.auth-card h2 { font-size: 1.2rem; color: #78350f; margin-bottom: 1rem; border-bottom: 2px solid #d97706; padding-bottom: 0.5rem; }
+.auth-card label { display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin: 0.75rem 0 0.3rem; }
+.auth-card input { width: 100%; padding: 0.6rem 0.8rem; font-size: 0.95rem; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; }
+.auth-card input:focus { border-color: #d97706; outline: none; background: #fff; }
+.auth-card button[type="submit"] { margin-top: 1rem; width: 100%; }
+.auth-status { margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; color: #78350f; }
+.switch { margin: 1rem 0 0; text-align: center; }
+.link-button { background: none; border: none; color: #78350f; font-weight: 600; cursor: pointer; font-size: 0.9rem; text-decoration: underline; }
+
+/* ─── App toolbar ─── */
+.app-toolbar {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  padding: 0.6rem 1.5rem; background: #78350f; color: #fff;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.week-label { font-weight: 600; font-size: 0.9rem; margin-left: 0.5rem; }
+
+/* ─── Buttons ─── */
+button { font: inherit; cursor: pointer; }
+.btn-primary { background: #78350f; color: #fff; border: none; border-radius: 6px; padding: 0.6rem 1.25rem; font-weight: 600; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: #e5e7eb; color: #374151; border: none; border-radius: 6px; padding: 0.45rem 0.9rem; font-size: 0.85rem; font-weight: 600; }
+.btn-secondary:hover { opacity: 0.85; }
+.btn-danger { background: #dc2626; color: #fff; border: none; border-radius: 6px; padding: 0.6rem 1.25rem; font-weight: 600; }
+.btn-danger:hover { opacity: 0.9; }
+
+/* ─── CT bar ─── */
+.ct-bar {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.6rem 1.5rem; background: #fff; border-bottom: 1px solid #e5e7eb;
+}
+.ct-title { font-weight: 700; font-size: 0.85rem; color: #78350f; }
+.ct-input { padding: 0.4rem 0.6rem; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 6px; width: 200px; }
+.ct-bar select { padding: 0.4rem 0.6rem; font-size: 0.85rem; border: 1px solid #ccc; border-radius: 6px; min-width: 180px; }
+
+/* ─── Week grid ─── */
+.schedule-wrap { padding: 1.5rem; }
+.week-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, 1fr);
+  gap: 4px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px;
+  overflow-x: auto;
+  min-width: 900px;
+}
+.time-gutter { display: flex; flex-direction: column; }
+.time-label {
+  height: 60px;
+  font-size: 0.7rem;
+  color: #999;
+  text-align: right;
+  padding-right: 6px;
+  line-height: 60px;
+}
+.day-column { display: flex; flex-direction: column; }
+.day-header {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #78350f;
+  padding: 0.4rem 0;
+  border-bottom: 2px solid #d97706;
+  margin-bottom: 4px;
+}
+.day-header.today { background: #fef3c7; border-radius: 6px; }
+.day-header .day-date { font-weight: 400; color: #888; font-size: 0.7rem; }
+.day-body {
+  position: relative;
+  height: 600px; /* 10 slots × 60px */
+  background: #fafafa;
+  border-radius: 6px;
+}
+.slot {
+  height: 60px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+.slot:hover { background: #fef3c7; }
+.appt-block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  overflow: hidden;
+  cursor: pointer;
+  border-left: 3px solid #d97706;
+  background: #fef3c7;
+  color: #78350f;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.appt-block.completed { background: #dcfce7; border-left-color: #15803d; color: #14532d; }
+.appt-block.cancelled { background: #fee2e2; border-left-color: #b91c1c; color: #7f1d1d; text-decoration: line-through; }
+.appt-block .appt-time { font-weight: 700; }
+.appt-block .appt-name { font-weight: 600; }
+
+/* ─── Dialog ─── */
+dialog {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: min(480px, 92vw);
+}
+dialog::backdrop { background: rgba(0,0,0,0.35); }
+dialog h2 { font-size: 1.1rem; color: #78350f; margin-bottom: 1rem; border-bottom: 2px solid #d97706; padding-bottom: 0.5rem; }
+dialog label { display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin: 0.75rem 0 0.3rem; }
+dialog input, dialog select, dialog textarea {
+  width: 100%; padding: 0.5rem 0.75rem; font-size: 0.95rem;
+  border: 1px solid #ccc; border-radius: 6px; background: #fafafa; font: inherit;
+}
+dialog input:focus, dialog select:focus, dialog textarea:focus { border-color: #d97706; outline: none; background: #fff; }
+dialog textarea { resize: vertical; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.form-group { margin-bottom: 0.5rem; }
+.dialog-actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; align-items: center; }
+.spacer { flex: 1; }

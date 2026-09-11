@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheduling Tool</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header>
+    <div class="logo-icon">📅</div>
+    <h1>Scheduling Tool</h1>
+    <span>Manage appointments, bookings, and availability</span>
+  </header>
+
+  <!-- Auth view -->
+  <main id="auth-view" class="auth-container" hidden>
+    <section class="auth-card">
+      <h2 id="auth-title">Sign In</h2>
+      <form id="auth-form">
+        <label id="name-label" for="auth-name" hidden>Name</label>
+        <input type="text" id="auth-name" placeholder="Your name" hidden />
+        <label for="auth-email">Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com" required />
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" placeholder="At least 8 characters" required />
+        <button type="submit" id="auth-submit" class="btn-primary">Sign In</button>
+      </form>
+      <p id="auth-status" class="auth-status" hidden></p>
+      <p class="switch">
+        <button type="button" id="auth-toggle" class="link-button">Create an account</button>
+      </p>
+    </section>
+  </main>
+
+  <!-- App view -->
+  <div id="app-view" hidden>
+    <div class="app-toolbar">
+      <div class="toolbar-left">
+        <button type="button" class="btn-secondary" onclick="shiftWeek(-1)">◀ Prev</button>
+        <button type="button" class="btn-secondary" onclick="goToToday()">Today</button>
+        <button type="button" class="btn-secondary" onclick="shiftWeek(1)">Next ▶</button>
+        <span class="week-label" id="weekLabel"></span>
+      </div>
+      <div class="toolbar-right">
+        <button type="button" class="btn-secondary" onclick="exportJSON()">📥 Export JSON</button>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('importJSONInput').click()">📤 Import JSON</button>
+        <input type="file" id="importJSONInput" accept=".json" style="display:none" onchange="importJSON(event)">
+        <button type="button" class="btn-secondary" onclick="exportCSV()">📊 Export CSV</button>
+        <button type="button" id="logout-button" class="btn-secondary">Sign out</button>
+      </div>
+    </div>
+
+    <div class="schedule-wrap">
+      <!-- Client Tracker integration -->
+      <div class="ct-bar">
+        <span class="ct-title">🔗 Client Tracker</span>
+        <input type="text" id="ctUrl" placeholder="http://localhost:3000" class="ct-input">
+        <input type="password" id="ctToken" placeholder="API token" class="ct-input">
+        <button type="button" class="btn-secondary" onclick="fetchClientsFromTracker()">Fetch Clients</button>
+        <select id="ctClientSelect" onchange="applyTrackerClient()">
+          <option value="">— Select a client —</option>
+        </select>
+      </div>
+
+      <!-- Week grid -->
+      <div class="week-grid" id="weekGrid"></div>
+    </div>
+  </div>
+
+  <!-- Booking / edit dialog -->
+  <dialog id="appt-dialog">
+    <form id="appt-form">
+      <h2 id="appt-form-title">Book Appointment</h2>
+      <label for="appt-client">Client Name *</label>
+      <input type="text" id="appt-client" required />
+      <div class="form-row">
+        <div class="form-group">
+          <label for="appt-email">Email</label>
+          <input type="email" id="appt-email" />
+        </div>
+        <div class="form-group">
+          <label for="appt-phone">Phone</label>
+          <input type="tel" id="appt-phone" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="appt-date">Date</label>
+          <input type="date" id="appt-date" required />
+        </div>
+        <div class="form-group">
+          <label for="appt-time">Time</label>
+          <input type="time" id="appt-time" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="appt-duration">Duration (minutes)</label>
+          <select id="appt-duration">
+            <option value="30">30 min</option>
+            <option value="60" selected>60 min</option>
+            <option value="90">90 min</option>
+            <option value="120">120 min</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="appt-status">Status</label>
+          <select id="appt-status">
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <label for="appt-notes">Notes</label>
+      <textarea id="appt-notes" rows="3"></textarea>
+      <div class="dialog-actions">
+        <button type="button" id="appt-delete" class="btn-danger" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" id="appt-cancel" class="btn-secondary">Cancel</button>
+        <button type="submit" id="appt-save" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
