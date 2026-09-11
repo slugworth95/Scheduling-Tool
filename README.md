@@ -13,6 +13,11 @@ Manage appointments, bookings, and availability. A full-stack app: vanilla JS fr
 - **Week navigation** — prev / today / next
 - **Export / Import** — JSON export/import (full week backup/restore, conflict-safe) + CSV export
 - **Client Tracker integration** — fetch clients and auto-fill the booking form
+- **Workflow: Create Invoice** — open any appointment and click **Create Invoice**; a draft invoice is created in the Invoice Generator (port 3002) with the appointment's client and a line item for the appointment date/time — powered by the shared SSO session
+
+## Shared sign-on (SSO)
+
+All four tools share one login. Users and sessions live in a shared database (`~/.slugworth/auth.db`, override with `SLUGWORTH_DB_PATH`), and the session token is stored in a shared `slugworth_token` cookie on `localhost` — cookies are shared across ports, so signing in on any tool signs you into all of them. Each server accepts the token from the `Authorization` header or the cookie.
 
 ## Run locally
 

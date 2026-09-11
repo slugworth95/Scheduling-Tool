@@ -221,6 +221,7 @@ async function openEdit(id) {
     $("appt-status").value = a.status || "scheduled";
     $("appt-notes").value = a.notes || "";
     $("appt-delete").hidden = false;
+    $("appt-invoice").hidden = false;
     dialog.showModal();
   } catch (err) {
     alert(err.message);
@@ -264,11 +265,55 @@ $("appt-delete").addEventListener("click", async () => {
 });
 
 // ═══════════════════════════════════════════════
+// WORKFLOW: CREATE INVOICE (completed appointment)
+// ═══════════════════════════════════════════════
+$("appt-invoice").addEventListener("click", async () => {
+  const url = $("invoiceUrl").value.trim().replace(/\/+$/, "");
+  const token = API.token;
+  if (!url || !token) {
+    alert("Enter the Invoice URL and make sure you're signed in.");
+    return;
+  }
+  localStorage.setItem("scheduling-tool.invoiceUrl", url);
+  const date = $("appt-date").value;
+  const time = $("appt-time").value;
+  const durationMin = Number($("appt-duration").value) || 60;
+  const payload = {
+    clientName: $("appt-client").value.trim() || "Client",
+    clientEmail: $("appt-email").value.trim() || null,
+    status: "draft",
+    issueDate: new Date().toISOString().slice(0, 10),
+    lineItems: [
+      {
+        description: "Appointment " + date + " " + time + " (" + durationMin + " min)",
+        qty: 1,
+        price: 0,
+      },
+    ],
+    notes: $("appt-notes").value.trim() || null,
+  };
+  try {
+    const res = await fetch(url + "/api/invoices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || "HTTP " + res.status);
+    alert("Invoice " + data.number + " created for " + payload.clientName + ".");
+    if (confirm("Open the Invoice Generator?")) window.open(url, "_blank");
+  } catch (err) {
+    alert("Could not create invoice: " + err.message);
+  }
+});
+
+// ═══════════════════════════════════════════════
 // CLIENT TRACKER INTEGRATION
 // ═══════════════════════════════════════════════
 function loadTrackerSettings() {
   $("ctUrl").value = localStorage.getItem("scheduling-tool.ctUrl") || "http://localhost:3000";
   $("ctToken").value = localStorage.getItem("scheduling-tool.ctToken") || "";
+  $("invoiceUrl").value = localStorage.getItem("scheduling-tool.invoiceUrl") || "http://localhost:3002";
 }
 
 async function fetchClientsFromTracker() {

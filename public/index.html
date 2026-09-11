@@ -61,6 +61,8 @@
         <select id="ctClientSelect" onchange="applyTrackerClient()">
           <option value="">— Select a client —</option>
         </select>
+        <span class="ct-title">🧾 Invoice URL</span>
+        <input type="text" id="invoiceUrl" placeholder="http://localhost:3002" class="ct-input">
       </div>
 
       <!-- Week grid -->
@@ -117,6 +119,7 @@
       <textarea id="appt-notes" rows="3"></textarea>
       <div class="dialog-actions">
         <button type="button" id="appt-delete" class="btn-danger" hidden>Delete</button>
+        <button type="button" id="appt-invoice" class="btn-secondary" hidden>🧾 Create Invoice</button>
         <span class="spacer"></span>
         <button type="button" id="appt-cancel" class="btn-secondary">Cancel</button>
         <button type="submit" id="appt-save" class="btn-primary">Save</button>
