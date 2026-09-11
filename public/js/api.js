@@ -66,6 +66,10 @@ const API = {
     return this.request("/api/auth/me");
   },
 
+  health() {
+    return this.request("/api/health");
+  },
+
   logout() {
     return this.request("/api/auth/logout", { method: "POST" }).catch(() => null);
   },
@@ -93,5 +97,38 @@ const API = {
 
   deleteAppointment(id) {
     return this.request(`/api/appointments/${id}`, { method: "DELETE" });
+  },
+
+  // Recurring series: create/update a one-off override for a specific date.
+  createOccurrence(recurrenceId, override) {
+    return this.request(`/api/appointments/${recurrenceId}/occurrences`, {
+      method: "POST",
+      body: JSON.stringify(override),
+    });
+  },
+
+  deleteOccurrence(recurrenceId, date) {
+    return this.request(`/api/appointments/${recurrenceId}/occurrences/${date}`, { method: "DELETE" });
+  },
+
+  listAvailability() {
+    return this.request("/api/availability");
+  },
+
+  saveAvailability(windows) {
+    return this.request("/api/availability", { method: "PUT", body: JSON.stringify(windows) });
+  },
+
+  listReminders(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    if (params.status) qs.set("status", params.status);
+    const q = qs.toString();
+    return this.request(`/api/reminders${q ? `?${q}` : ""}`);
+  },
+
+  testReminder(to) {
+    return this.request("/api/reminders/test", { method: "POST", body: JSON.stringify({ to }) });
   },
 };

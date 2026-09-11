@@ -79,9 +79,13 @@ const SLOT_HEIGHT = 60; // px per hour
 let weekStart = null; // Date (Monday)
 let appointments = [];
 let editingId = null;
+let editingVirtual = null; // { recurrenceId, date, templateId } when editing a virtual occurrence
+let currentAppt = null; // the appointment object currently open in the dialog
 let fetchedClients = [];
 let currentApptProposal = null; // { id, url } when the appointment links to a proposal
 let currentApptInvoice = null; // { id, url } when the appointment links to an invoice
+let availability = []; // [{ dayOfWeek, startTime, endTime }]
+let virtualAppts = {}; // virtual occurrence id -> full appointment object
 
 function mondayOf(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -108,9 +112,15 @@ async function loadWeek() {
   toDate.setDate(toDate.getDate() + 6);
   const to = toISODate(toDate);
   try {
-    appointments = await API.listAppointments({ from, to });
+    const [appts, avail] = await Promise.all([
+      API.listAppointments({ from, to }),
+      API.listAvailability(),
+    ]);
+    appointments = appts;
+    availability = avail;
   } catch (err) {
     appointments = [];
+    availability = [];
     alert(err.message);
   }
   renderWeek();
@@ -126,6 +136,13 @@ function renderWeek() {
     weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
     " – " +
     endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  // Availability lookup: dayOfWeek (Mon=0) -> window. No windows at all = fully open.
+  const availByDay = {};
+  for (const w of availability) availByDay[w.dayOfWeek] = w;
+  const hasWindows = availability.length > 0;
+
+  virtualAppts = {};
 
   // Time gutter
   let html = '<div class="time-gutter">';
@@ -144,16 +161,24 @@ function renderWeek() {
       .filter((a) => a.date === dateStr)
       .sort((a, b) => a.time.localeCompare(b.time));
 
+    const dow = (day.getDay() + 6) % 7; // Mon=0
+    const win = availByDay[dow];
+    const dayOpen = !hasWindows || !!win;
+
     html += `<div class="day-column">
       <div class="day-header${isToday ? " today" : ""}">
         ${DAY_NAMES[i]} <span class="day-date">${day.getMonth() + 1}/${day.getDate()}</span>
       </div>
       <div class="day-body" data-date="${dateStr}">`;
 
-    // Clickable hour slots
+    // Clickable hour slots (unavailable ones are greyed out)
     for (let h = SLOT_START_HOUR; h < SLOT_END_HOUR; h++) {
       const timeStr = String(h).padStart(2, "0") + ":00";
-      html += `<div class="slot" data-date="${dateStr}" data-time="${timeStr}"></div>`;
+      const slotStart = h * 60;
+      const slotEnd = slotStart + 60;
+      const available =
+        dayOpen && (!win || (slotStart >= toMinutes(win.startTime) && slotEnd <= toMinutes(win.endTime)));
+      html += `<div class="slot${available ? "" : " unavailable"}" data-date="${dateStr}" data-time="${timeStr}"${available ? "" : ' title="Outside availability"'}></div>`;
     }
 
     // Appointment blocks
@@ -162,8 +187,11 @@ function renderWeek() {
       const top = ((startMin - SLOT_START_HOUR * 60) / 60) * SLOT_HEIGHT;
       const height = Math.max((a.durationMin / 60) * SLOT_HEIGHT, 24);
       const timeLabel = a.time.slice(0, 5);
-      html += `<div class="appt-block ${a.status}" data-id="${a.id}" style="top:${top}px;height:${height}px;">
-        <div class="appt-time">${timeLabel} · ${a.durationMin}m</div>
+      const isVirtual = String(a.id).startsWith("r");
+      if (isVirtual) virtualAppts[a.id] = a;
+      const badge = a.isRecurring ? " 🔁" : "";
+      html += `<div class="appt-block ${a.status}${a.isRecurring ? " recurring" : ""}" data-id="${a.id}" style="top:${top}px;height:${height}px;">
+        <div class="appt-time">${timeLabel} · ${a.durationMin}m${badge}</div>
         <div class="appt-name">${escHtml(a.clientName)}</div>
       </div>`;
     });
@@ -175,10 +203,15 @@ function renderWeek() {
 
   // Wire up clicks
   grid.querySelectorAll(".slot").forEach((slot) => {
+    if (slot.classList.contains("unavailable")) return;
     slot.addEventListener("click", () => openBooking(slot.dataset.date, slot.dataset.time));
   });
   grid.querySelectorAll(".appt-block").forEach((block) => {
-    block.addEventListener("click", () => openEdit(Number(block.dataset.id)));
+    block.addEventListener("click", () => {
+      const id = block.dataset.id;
+      if (String(id).startsWith("r")) openEditVirtual(id);
+      else openEdit(Number(id));
+    });
   });
 }
 
@@ -198,41 +231,168 @@ function goToToday() {
 const dialog = $("appt-dialog");
 const apptForm = $("appt-form");
 
+function resetRepeatFields() {
+  $("appt-repeat").value = "";
+  $("appt-repeat-interval").value = "1";
+  $("appt-repeat-days").hidden = true;
+  document.querySelectorAll("#appt-repeat-days-box input").forEach((cb) => (cb.checked = false));
+  $("appt-repeat-end").value = "";
+  updateRepeatUnit();
+}
+
+function setRepeatFields(rec) {
+  if (!rec) return resetRepeatFields();
+  $("appt-repeat").value = rec.frequency || "";
+  $("appt-repeat-interval").value = String(rec.interval || 1);
+  const days = rec.daysOfWeek || [];
+  document.querySelectorAll("#appt-repeat-days-box input").forEach((cb) => {
+    cb.checked = days.includes(Number(cb.value));
+  });
+  $("appt-repeat-days").hidden = (rec.frequency || "") !== "weekly";
+  $("appt-repeat-end").value = rec.endDate || "";
+  updateRepeatUnit();
+}
+
+function updateRepeatUnit() {
+  const freq = $("appt-repeat").value;
+  $("appt-repeat-unit").textContent =
+    freq === "daily" ? "day(s)" : freq === "weekly" ? "week(s)" : freq === "monthly" ? "month(s)" : "week(s)";
+}
+
+$("appt-repeat").addEventListener("change", () => {
+  $("appt-repeat-days").hidden = $("appt-repeat").value !== "weekly";
+  updateRepeatUnit();
+});
+
+function buildRecurrencePayload() {
+  const frequency = $("appt-repeat").value;
+  if (!frequency) return null;
+  let daysOfWeek;
+  if (frequency === "weekly") {
+    daysOfWeek = [...document.querySelectorAll("#appt-repeat-days-box input:checked")].map((cb) => Number(cb.value));
+    if (!daysOfWeek.length) {
+      // Default to the day of the start date.
+      const d = new Date($("appt-date").value + "T00:00:00");
+      daysOfWeek = [(d.getDay() + 6) % 7 + 1];
+    }
+  }
+  return {
+    frequency,
+    interval: Number($("appt-repeat-interval").value) || 1,
+    daysOfWeek,
+    endDate: $("appt-repeat-end").value || null,
+  };
+}
+
 function openBooking(date, time) {
   editingId = null;
+  editingVirtual = null;
+  currentAppt = null;
   $("appt-form-title").textContent = "Book Appointment";
   apptForm.reset();
   $("appt-date").value = date || toISODate(new Date());
   $("appt-time").value = time || "09:00";
   $("appt-status").value = "scheduled";
+  $("appt-reminder").value = "";
+  $("appt-repeat-section").hidden = false;
+  resetRepeatFields();
+  $("appt-series-note").hidden = true;
+  $("appt-edit-series").hidden = true;
   $("appt-delete").hidden = true;
+  $("appt-delete").textContent = "Delete";
   dialog.showModal();
+}
+
+// Fill the dialog from an appointment object (real row or virtual occurrence).
+function fillForm(a, opts = {}) {
+  const isVirtual = !!opts.virtual;
+  $("appt-client").value = a.clientName || "";
+  $("appt-email").value = a.clientEmail || "";
+  $("appt-phone").value = a.clientPhone || "";
+  $("appt-date").value = a.date || "";
+  $("appt-time").value = a.time || "";
+  $("appt-duration").value = String(a.durationMin || 60);
+  $("appt-status").value = a.status || "scheduled";
+  $("appt-notes").value = a.notes || "";
+  $("appt-reminder").value = a.reminderMinutes ? String(a.reminderMinutes) : "";
+  currentApptProposal = a.proposalId && a.proposalUrl ? { id: a.proposalId, url: a.proposalUrl } : null;
+  $("appt-proposal").hidden = !currentApptProposal;
+  currentApptInvoice = a.invoiceId && a.invoiceUrl ? { id: a.invoiceId, url: a.invoiceUrl } : null;
+  $("appt-view-invoice").hidden = !currentApptInvoice;
+  $("appt-invoice").hidden = !!currentApptInvoice;
+
+  const isSeries = !!a.recurrenceId;
+  const isTemplate = isSeries && a.isTemplate;
+
+  // Repeat fields: editable when creating or editing the series template.
+  $("appt-repeat-section").hidden = isVirtual || (isSeries && !isTemplate);
+  if (isSeries && isTemplate) setRepeatFields(a.recurrence);
+  else if (!isSeries) resetRepeatFields();
+
+  $("appt-edit-series").hidden = true;
+  $("appt-delete").hidden = false;
+  if (isVirtual) {
+    $("appt-series-note").textContent =
+      "This is one occurrence of a repeating series — changes apply to this date only.";
+    $("appt-series-note").hidden = false;
+    $("appt-edit-series").hidden = false;
+    $("appt-delete").textContent = "Skip this occurrence";
+  } else if (isTemplate) {
+    $("appt-series-note").textContent =
+      "This is the first occurrence of a repeating series — changes apply to the whole series.";
+    $("appt-series-note").hidden = false;
+    $("appt-delete").textContent = "Delete series";
+  } else if (isSeries) {
+    $("appt-series-note").textContent = "This is a one-off change to a repeating series.";
+    $("appt-series-note").hidden = false;
+    $("appt-edit-series").hidden = false;
+    $("appt-delete").textContent = "Delete this occurrence";
+  } else {
+    $("appt-series-note").hidden = true;
+    $("appt-delete").textContent = "Delete";
+  }
 }
 
 async function openEdit(id) {
   try {
     const a = await API.getAppointment(id);
     editingId = id;
+    editingVirtual = null;
+    currentAppt = a;
     $("appt-form-title").textContent = "Edit Appointment";
-    $("appt-client").value = a.clientName || "";
-    $("appt-email").value = a.clientEmail || "";
-    $("appt-phone").value = a.clientPhone || "";
-    $("appt-date").value = a.date || "";
-    $("appt-time").value = a.time || "";
-    $("appt-duration").value = String(a.durationMin || 60);
-    $("appt-status").value = a.status || "scheduled";
-    $("appt-notes").value = a.notes || "";
-    $("appt-delete").hidden = false;
-    currentApptProposal = a.proposalId && a.proposalUrl ? { id: a.proposalId, url: a.proposalUrl } : null;
-    $("appt-proposal").hidden = !currentApptProposal;
-    currentApptInvoice = a.invoiceId && a.invoiceUrl ? { id: a.invoiceId, url: a.invoiceUrl } : null;
-    $("appt-view-invoice").hidden = !currentApptInvoice;
-    $("appt-invoice").hidden = !!currentApptInvoice;
+    fillForm(a);
     dialog.showModal();
   } catch (err) {
     alert(err.message);
   }
 }
+
+function openEditVirtual(id) {
+  const v = virtualAppts[id];
+  if (!v) return;
+  editingId = null;
+  editingVirtual = { recurrenceId: v.recurrenceId, date: v.date, templateId: v.templateId };
+  currentAppt = v;
+  $("appt-form-title").textContent = "Edit Occurrence";
+  fillForm(v, { virtual: true });
+  dialog.showModal();
+}
+
+// Switch from a single occurrence to editing the whole series.
+$("appt-edit-series").addEventListener("click", async () => {
+  const templateId = editingVirtual ? editingVirtual.templateId : currentAppt && currentAppt.templateId;
+  if (!templateId) return;
+  try {
+    const t = await API.getAppointment(templateId);
+    editingId = templateId;
+    editingVirtual = null;
+    currentAppt = t;
+    $("appt-form-title").textContent = "Edit Series";
+    fillForm(t);
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 apptForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -245,10 +405,18 @@ apptForm.addEventListener("submit", async (event) => {
     durationMin: Number($("appt-duration").value) || 60,
     status: $("appt-status").value,
     notes: $("appt-notes").value.trim() || null,
+    reminderMinutes: Number($("appt-reminder").value) || null,
   };
   try {
-    if (editingId) await API.updateAppointment(editingId, payload);
-    else await API.createAppointment(payload);
+    if (editingVirtual) {
+      // One-off override for this date of the series.
+      await API.createOccurrence(editingVirtual.recurrenceId, payload);
+    } else {
+      const recurrence = buildRecurrencePayload();
+      if (recurrence) payload.recurrence = recurrence;
+      if (editingId) await API.updateAppointment(editingId, payload);
+      else await API.createAppointment(payload);
+    }
     dialog.close();
     loadWeek();
   } catch (err) {
@@ -271,10 +439,25 @@ $("appt-view-invoice").addEventListener("click", () => {
 });
 
 $("appt-delete").addEventListener("click", async () => {
-  if (!editingId) return;
-  if (!confirm("Delete this appointment?")) return;
   try {
-    await API.deleteAppointment(editingId);
+    if (editingVirtual) {
+      if (!confirm("Skip this occurrence? It will be marked cancelled for this date only.")) return;
+      await API.createOccurrence(editingVirtual.recurrenceId, { date: editingVirtual.date, status: "cancelled" });
+    } else if (editingId) {
+      const a = currentAppt;
+      if (a && a.recurrenceId && a.isTemplate) {
+        if (!confirm("Delete the entire recurring series (all occurrences)?")) return;
+        await API.deleteAppointment(editingId);
+      } else if (a && a.recurrenceId) {
+        if (!confirm("Delete this one-off change? The date will revert to the series.")) return;
+        await API.deleteAppointment(editingId);
+      } else {
+        if (!confirm("Delete this appointment?")) return;
+        await API.deleteAppointment(editingId);
+      }
+    } else {
+      return;
+    }
     dialog.close();
     loadWeek();
   } catch (err) {
@@ -408,21 +591,127 @@ function applyTrackerClient() {
 }
 
 // ═══════════════════════════════════════════════
+// AVAILABILITY WINDOWS
+// ═══════════════════════════════════════════════
+const DAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+async function openAvailability() {
+  try {
+    availability = await API.listAvailability();
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  const byDay = {};
+  for (const w of availability) byDay[w.dayOfWeek] = w;
+  $("avail-rows").innerHTML = DAY_LABELS.map((label, i) => {
+    const w = byDay[i];
+    return `<div class="avail-row">
+      <label class="avail-day"><input type="checkbox" class="avail-enabled" data-day="${i}" ${w ? "checked" : ""} /> ${label}</label>
+      <input type="time" class="avail-start" data-day="${i}" value="${w ? w.startTime : "09:00"}" />
+      <span class="avail-to">to</span>
+      <input type="time" class="avail-end" data-day="${i}" value="${w ? w.endTime : "17:00"}" />
+    </div>`;
+  }).join("");
+  $("avail-dialog").showModal();
+}
+
+$("avail-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const windows = [];
+  document.querySelectorAll(".avail-row").forEach((row) => {
+    const enabled = row.querySelector(".avail-enabled");
+    if (!enabled.checked) return;
+    const startTime = row.querySelector(".avail-start").value;
+    const endTime = row.querySelector(".avail-end").value;
+    if (!startTime || !endTime) return;
+    windows.push({ dayOfWeek: Number(enabled.dataset.day), startTime, endTime });
+  });
+  try {
+    availability = await API.saveAvailability(windows);
+    $("avail-dialog").close();
+    loadWeek();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+$("avail-cancel").addEventListener("click", () => $("avail-dialog").close());
+
+// ═══════════════════════════════════════════════
+// EMAIL REMINDERS
+// ═══════════════════════════════════════════════
+async function openReminders() {
+  const from = toISODate(new Date());
+  const toDate = new Date();
+  toDate.setDate(toDate.getDate() + 30);
+  const to = toISODate(toDate);
+  let reminders = [];
+  try {
+    const [list, health] = await Promise.all([API.listReminders({ from, to }), API.health()]);
+    reminders = list;
+    const smtp = !!(health.reminders && health.reminders.smtpConfigured);
+    $("reminders-mode").textContent = smtp
+      ? "SMTP is configured — reminders are sent as real emails."
+      : "SMTP is not configured — reminders are logged to the server console. Set SMTP_HOST (and SMTP_USER/SMTP_PASS) to send real email.";
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  if (!reminders.length) {
+    $("reminders-list").innerHTML = '<p class="empty">No reminders in the next 30 days.</p>';
+  } else {
+    $("reminders-list").innerHTML = reminders
+      .map(
+        (r) => `<div class="reminder-item ${r.status}">
+          <div class="reminder-main">
+            <strong>${escHtml(r.clientName)}</strong>
+            <span class="reminder-when">${escHtml(r.date)} ${escHtml(r.time)}</span>
+          </div>
+          <div class="reminder-meta">
+            <span>Remind: ${escHtml(r.remindAt)}</span>
+            <span class="reminder-status">${r.status}</span>
+            ${r.clientEmail ? `<span>→ ${escHtml(r.clientEmail)}</span>` : '<span class="muted">no email</span>'}
+          </div>
+        </div>`
+      )
+      .join("");
+  }
+  $("reminders-dialog").showModal();
+}
+
+$("reminders-close").addEventListener("click", () => $("reminders-dialog").close());
+
+$("reminders-test").addEventListener("click", async () => {
+  if (!confirm("Send a test reminder to your account email?")) return;
+  try {
+    const r = await API.testReminder();
+    alert("Test email sent to " + r.to);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+// ═══════════════════════════════════════════════
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════
 function exportJSON() {
   const payload = {
     exportedAt: new Date().toISOString(),
-    appointments: appointments.map((a) => ({
-      clientName: a.clientName,
-      clientEmail: a.clientEmail,
-      clientPhone: a.clientPhone,
-      date: a.date,
-      time: a.time,
-      durationMin: a.durationMin,
-      notes: a.notes,
-      status: a.status,
-    })),
+    appointments: appointments
+      .filter((a) => !String(a.id).startsWith("r")) // skip derived occurrences
+      .map((a) => ({
+        clientName: a.clientName,
+        clientEmail: a.clientEmail,
+        clientPhone: a.clientPhone,
+        date: a.date,
+        time: a.time,
+        durationMin: a.durationMin,
+        notes: a.notes,
+        status: a.status,
+        reminderMinutes: a.reminderMinutes || null,
+        recurrence: a.isTemplate ? a.recurrence : undefined,
+      })),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -459,6 +748,8 @@ function importJSON(event) {
             durationMin: a.durationMin || 60,
             notes: a.notes || null,
             status: a.status || "scheduled",
+            reminderMinutes: a.reminderMinutes || null,
+            recurrence: a.recurrence || undefined,
           });
           created++;
         } catch (err) {

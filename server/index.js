@@ -4,6 +4,9 @@ const path = require("node:path");
 const express = require("express");
 const { register, login, requireAuth, setTokenCookie, clearTokenCookie } = require("./auth");
 const appointmentsRouter = require("./routes/appointments");
+const availabilityRouter = require("./routes/availability");
+const remindersRouter = require("./routes/reminders");
+const reminderEngine = require("./reminders");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -22,7 +25,12 @@ app.use((req, res, next) => {
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ service: "scheduling-tool", status: "ok", version: "2.0.0" });
+  res.json({
+    service: "scheduling-tool",
+    status: "ok",
+    version: "2.0.0",
+    reminders: { smtpConfigured: !!process.env.SMTP_HOST },
+  });
 });
 
 // Auth
@@ -77,6 +85,8 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
 
 // Protected API
 app.use("/api/appointments", requireAuth, appointmentsRouter);
+app.use("/api/availability", requireAuth, availabilityRouter);
+app.use("/api/reminders", requireAuth, remindersRouter);
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -86,4 +96,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Scheduling Tool running at http://localhost:${PORT}`);
+  reminderEngine.start();
 });

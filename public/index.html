@@ -47,6 +47,8 @@
         <button type="button" class="btn-secondary" onclick="document.getElementById('importJSONInput').click()">📤 Import JSON</button>
         <input type="file" id="importJSONInput" accept=".json" style="display:none" onchange="importJSON(event)">
         <button type="button" class="btn-secondary" onclick="exportCSV()">📊 Export CSV</button>
+        <button type="button" class="btn-secondary" onclick="openAvailability()">🕒 Availability</button>
+        <button type="button" class="btn-secondary" onclick="openReminders()">🔔 Reminders</button>
         <button type="button" id="logout-button" class="btn-secondary">Sign out</button>
       </div>
     </div>
@@ -115,10 +117,60 @@
           </select>
         </div>
       </div>
+      <div id="appt-repeat-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="appt-repeat">Repeat</label>
+            <select id="appt-repeat">
+              <option value="">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="appt-repeat-interval">Every</label>
+            <div class="interval-wrap">
+              <input type="number" id="appt-repeat-interval" min="1" max="52" value="1" />
+              <span id="appt-repeat-unit">week(s)</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" id="appt-repeat-days" hidden>
+          <label>Repeat on</label>
+          <div class="day-checkboxes" id="appt-repeat-days-box">
+            <label class="day-check"><input type="checkbox" value="1" /> Mon</label>
+            <label class="day-check"><input type="checkbox" value="2" /> Tue</label>
+            <label class="day-check"><input type="checkbox" value="3" /> Wed</label>
+            <label class="day-check"><input type="checkbox" value="4" /> Thu</label>
+            <label class="day-check"><input type="checkbox" value="5" /> Fri</label>
+            <label class="day-check"><input type="checkbox" value="6" /> Sat</label>
+            <label class="day-check"><input type="checkbox" value="7" /> Sun</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="appt-repeat-end">End date (optional)</label>
+            <input type="date" id="appt-repeat-end" />
+          </div>
+          <div class="form-group">
+            <label for="appt-reminder">Email reminder</label>
+            <select id="appt-reminder">
+              <option value="">None</option>
+              <option value="60">1 hour before</option>
+              <option value="1440">1 day before</option>
+              <option value="2880">2 days before</option>
+              <option value="10080">1 week before</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <label for="appt-notes">Notes</label>
       <textarea id="appt-notes" rows="3"></textarea>
+      <p id="appt-series-note" class="series-note" hidden></p>
       <div class="dialog-actions">
         <button type="button" id="appt-delete" class="btn-danger" hidden>Delete</button>
+        <button type="button" id="appt-edit-series" class="btn-secondary" hidden>Edit entire series</button>
         <button type="button" id="appt-proposal" class="btn-secondary" hidden>📄 Open Proposal</button>
         <button type="button" id="appt-invoice" class="btn-secondary" hidden>🧾 Create Invoice</button>
         <button type="button" id="appt-view-invoice" class="btn-secondary" hidden>🧾 View Invoice</button>
@@ -127,6 +179,34 @@
         <button type="submit" id="appt-save" class="btn-primary">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Availability dialog -->
+  <dialog id="avail-dialog">
+    <form id="avail-form">
+      <h2>Availability Windows</h2>
+      <p class="dialog-hint">Days without a window are closed. Uncheck every day to be fully open (8:00–18:00).</p>
+      <div id="avail-rows"></div>
+      <div class="dialog-actions">
+        <button type="button" id="avail-cancel" class="btn-secondary">Cancel</button>
+        <span class="spacer"></span>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Reminders dialog -->
+  <dialog id="reminders-dialog">
+    <div>
+      <h2>Email Reminders</h2>
+      <p class="dialog-hint" id="reminders-mode"></p>
+      <div id="reminders-list" class="reminders-list"></div>
+      <div class="dialog-actions">
+        <button type="button" id="reminders-test" class="btn-secondary">Send test email</button>
+        <span class="spacer"></span>
+        <button type="button" id="reminders-close" class="btn-primary">Close</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="js/api.js"></script>
