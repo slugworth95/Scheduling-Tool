@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scheduling Tool</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Scheduling Tool</h1>
+    <p class="tagline">Manage appointments, bookings, and availability.</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Book Appointment</h2>
+      <form id="booking-form">
+        <label for="client-name">Client Name</label>
+        <input type="text" id="client-name" placeholder="Acme Corp" required />
+
+        <label for="appt-date">Date</label>
+        <input type="date" id="appt-date" required />
+
+        <label for="appt-time">Time</label>
+        <input type="time" id="appt-time" required />
+
+        <button type="submit">Book</button>
+      </form>
+      <p id="status" class="status" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Upcoming Appointments</h2>
+      <ul id="appointment-list" class="appointment-list">
+        <li class="empty">No appointments yet.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
