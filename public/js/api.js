@@ -8,8 +8,17 @@ class ApiError extends Error {
   }
 }
 
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function clearAuthCookie() {
+  document.cookie = "slugworth_token=; Path=/; SameSite=Lax; Max-Age=0";
+}
+
 const API = {
-  token: localStorage.getItem("scheduling-tool.token") || null,
+  token: localStorage.getItem("scheduling-tool.token") || getCookie("slugworth_token") || null,
 
   async request(path, options = {}) {
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -33,7 +42,10 @@ const API = {
   setToken(token) {
     this.token = token;
     if (token) localStorage.setItem("scheduling-tool.token", token);
-    else localStorage.removeItem("scheduling-tool.token");
+    else {
+      localStorage.removeItem("scheduling-tool.token");
+      clearAuthCookie();
+    }
   },
 
   register(name, email, password) {
@@ -48,6 +60,14 @@ const API = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
+  },
+
+  me() {
+    return this.request("/api/auth/me");
+  },
+
+  logout() {
+    return this.request("/api/auth/logout", { method: "POST" }).catch(() => null);
   },
 
   listAppointments(params = {}) {
