@@ -26,6 +26,8 @@ db.exec(`
     client_id INTEGER,
     proposal_id INTEGER,
     proposal_url TEXT,
+    invoice_id INTEGER,
+    invoice_url TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -34,11 +36,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
 `);
 
-// Migration: add proposal link columns if the table predates them.
+// Migration: add proposal/invoice link columns if the table predates them.
 const apptCols = db.prepare("PRAGMA table_info(appointments)").all().map((c) => c.name);
 if (!apptCols.includes("proposal_id")) {
   db.exec("ALTER TABLE appointments ADD COLUMN proposal_id INTEGER");
   db.exec("ALTER TABLE appointments ADD COLUMN proposal_url TEXT");
+}
+if (!apptCols.includes("invoice_id")) {
+  db.exec("ALTER TABLE appointments ADD COLUMN invoice_id INTEGER");
+  db.exec("ALTER TABLE appointments ADD COLUMN invoice_url TEXT");
 }
 
 module.exports = db;

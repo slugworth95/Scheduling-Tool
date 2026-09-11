@@ -81,6 +81,7 @@ let appointments = [];
 let editingId = null;
 let fetchedClients = [];
 let currentApptProposal = null; // { id, url } when the appointment links to a proposal
+let currentApptInvoice = null; // { id, url } when the appointment links to an invoice
 
 function mondayOf(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -222,9 +223,11 @@ async function openEdit(id) {
     $("appt-status").value = a.status || "scheduled";
     $("appt-notes").value = a.notes || "";
     $("appt-delete").hidden = false;
-    $("appt-invoice").hidden = false;
     currentApptProposal = a.proposalId && a.proposalUrl ? { id: a.proposalId, url: a.proposalUrl } : null;
     $("appt-proposal").hidden = !currentApptProposal;
+    currentApptInvoice = a.invoiceId && a.invoiceUrl ? { id: a.invoiceId, url: a.invoiceUrl } : null;
+    $("appt-view-invoice").hidden = !currentApptInvoice;
+    $("appt-invoice").hidden = !!currentApptInvoice;
     dialog.showModal();
   } catch (err) {
     alert(err.message);
@@ -258,6 +261,12 @@ $("appt-cancel").addEventListener("click", () => dialog.close());
 $("appt-proposal").addEventListener("click", () => {
   if (currentApptProposal) {
     window.open(currentApptProposal.url + "/?proposal=" + currentApptProposal.id, "_blank");
+  }
+});
+
+$("appt-view-invoice").addEventListener("click", () => {
+  if (currentApptInvoice) {
+    window.open(currentApptInvoice.url + "/?invoice=" + currentApptInvoice.id, "_blank");
   }
 });
 
@@ -310,6 +319,17 @@ $("appt-invoice").addEventListener("click", async () => {
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || "HTTP " + res.status);
     let message = "Invoice " + data.number + " created for " + payload.clientName + ".";
+    // Link the invoice back to this appointment.
+    if (editingId) {
+      try {
+        await API.updateAppointment(editingId, { invoiceId: data.id, invoiceUrl: url });
+        currentApptInvoice = { id: data.id, url: url };
+        $("appt-view-invoice").hidden = false;
+        $("appt-invoice").hidden = true;
+      } catch {
+        // Non-fatal: the invoice was still created.
+      }
+    }
     // Workflow: mark the linked proposal as invoiced.
     if (currentApptProposal && currentApptProposal.url && currentApptProposal.id) {
       try {
