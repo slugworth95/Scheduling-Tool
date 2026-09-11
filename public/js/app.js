@@ -80,6 +80,7 @@ let weekStart = null; // Date (Monday)
 let appointments = [];
 let editingId = null;
 let fetchedClients = [];
+let currentApptProposal = null; // { id, url } when the appointment links to a proposal
 
 function mondayOf(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -222,6 +223,8 @@ async function openEdit(id) {
     $("appt-notes").value = a.notes || "";
     $("appt-delete").hidden = false;
     $("appt-invoice").hidden = false;
+    currentApptProposal = a.proposalId && a.proposalUrl ? { id: a.proposalId, url: a.proposalUrl } : null;
+    $("appt-proposal").hidden = !currentApptProposal;
     dialog.showModal();
   } catch (err) {
     alert(err.message);
@@ -251,6 +254,12 @@ apptForm.addEventListener("submit", async (event) => {
 });
 
 $("appt-cancel").addEventListener("click", () => dialog.close());
+
+$("appt-proposal").addEventListener("click", () => {
+  if (currentApptProposal) {
+    window.open(currentApptProposal.url + "/?proposal=" + currentApptProposal.id, "_blank");
+  }
+});
 
 $("appt-delete").addEventListener("click", async () => {
   if (!editingId) return;
@@ -300,7 +309,21 @@ $("appt-invoice").addEventListener("click", async () => {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || "HTTP " + res.status);
-    alert("Invoice " + data.number + " created for " + payload.clientName + ".");
+    let message = "Invoice " + data.number + " created for " + payload.clientName + ".";
+    // Workflow: mark the linked proposal as invoiced.
+    if (currentApptProposal && currentApptProposal.url && currentApptProposal.id) {
+      try {
+        const pRes = await fetch(currentApptProposal.url + "/api/proposals/" + currentApptProposal.id + "/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ status: "invoiced" }),
+        });
+        if (pRes.ok) message += " Proposal marked as invoiced.";
+      } catch {
+        // Non-fatal: the invoice was still created.
+      }
+    }
+    alert(message);
     if (confirm("Open the Invoice Generator?")) window.open(url, "_blank");
   } catch (err) {
     alert("Could not create invoice: " + err.message);
@@ -312,7 +335,8 @@ $("appt-invoice").addEventListener("click", async () => {
 // ═══════════════════════════════════════════════
 function loadTrackerSettings() {
   $("ctUrl").value = localStorage.getItem("scheduling-tool.ctUrl") || "http://localhost:3000";
-  $("ctToken").value = localStorage.getItem("scheduling-tool.ctToken") || "";
+  // Auto-fill the token from the shared SSO cookie (current session first).
+  $("ctToken").value = getCookie("slugworth_token") || localStorage.getItem("scheduling-tool.ctToken") || "";
   $("invoiceUrl").value = localStorage.getItem("scheduling-tool.invoiceUrl") || "http://localhost:3002";
 }
 

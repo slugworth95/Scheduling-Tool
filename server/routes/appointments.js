@@ -19,6 +19,8 @@ function serializeAppointment(row) {
     notes: row.notes,
     status: row.status,
     clientId: row.client_id,
+    proposalId: row.proposal_id,
+    proposalUrl: row.proposal_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -108,8 +110,8 @@ router.post("/", (req, res) => {
 
   const result = db
     .prepare(
-      `INSERT INTO appointments (user_id, client_name, client_email, client_phone, date, time, duration_min, notes, status, client_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO appointments (user_id, client_name, client_email, client_phone, date, time, duration_min, notes, status, client_id, proposal_id, proposal_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       req.user.id,
@@ -121,7 +123,9 @@ router.post("/", (req, res) => {
       durationMin,
       body.notes || null,
       status,
-      body.clientId || null
+      body.clientId || null,
+      body.proposalId || null,
+      body.proposalUrl || null
     );
   res
     .status(201)
@@ -146,6 +150,8 @@ router.put("/:id", (req, res) => {
     notes: body.notes !== undefined ? body.notes : existing.notes,
     status: body.status !== undefined ? (VALID_STATUSES.includes(body.status) ? body.status : existing.status) : existing.status,
     clientId: body.clientId !== undefined ? body.clientId : existing.client_id,
+    proposalId: body.proposalId !== undefined ? body.proposalId : existing.proposal_id,
+    proposalUrl: body.proposalUrl !== undefined ? body.proposalUrl : existing.proposal_url,
   };
 
   if (!next.clientName) return res.status(400).json({ error: "clientName cannot be empty" });
@@ -166,7 +172,7 @@ router.put("/:id", (req, res) => {
 
   db.prepare(
     `UPDATE appointments
-     SET client_name = ?, client_email = ?, client_phone = ?, date = ?, time = ?, duration_min = ?, notes = ?, status = ?, client_id = ?, updated_at = datetime('now')
+     SET client_name = ?, client_email = ?, client_phone = ?, date = ?, time = ?, duration_min = ?, notes = ?, status = ?, client_id = ?, proposal_id = ?, proposal_url = ?, updated_at = datetime('now')
      WHERE id = ?`
   ).run(
     next.clientName,
@@ -178,6 +184,8 @@ router.put("/:id", (req, res) => {
     next.notes,
     next.status,
     next.clientId,
+    next.proposalId,
+    next.proposalUrl,
     existing.id
   );
   res.json(serializeAppointment(db.prepare("SELECT * FROM appointments WHERE id = ?").get(existing.id)));

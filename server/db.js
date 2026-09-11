@@ -24,13 +24,21 @@ db.exec(`
     notes TEXT,
     status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','completed','cancelled')),
     client_id INTEGER,
+    proposal_id INTEGER,
+    proposal_url TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id);
   CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
-  CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 `);
+
+// Migration: add proposal link columns if the table predates them.
+const apptCols = db.prepare("PRAGMA table_info(appointments)").all().map((c) => c.name);
+if (!apptCols.includes("proposal_id")) {
+  db.exec("ALTER TABLE appointments ADD COLUMN proposal_id INTEGER");
+  db.exec("ALTER TABLE appointments ADD COLUMN proposal_url TEXT");
+}
 
 module.exports = db;
