@@ -7,9 +7,19 @@ Thumbs.db
 .idea/
 *.swp
 
-# Node (if added later)
+# Node
 node_modules/
 npm-debug.log*
+
+# Local data (SQLite database)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment
+.env
 
 # Logs
 *.log
